@@ -7,7 +7,6 @@ on:
 jobs:
   build-test-and-push:
     runs-on: ubuntu-latest
-    # Даем права на запись в пакеты (Registry)
     permissions:
       contents: read
       packages: write
@@ -33,6 +32,11 @@ jobs:
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
           pytest test_app.py
 
+      # ШАГ ДЛЯ ИСПРАВЛЕНИЯ РЕГИСТРА
+      - name: Lowercase repo name
+        run: |
+          echo "REPO_LOWER=${GITHUB_REPOSITORY,,}" >> ${GITHUB_ENV}
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -48,7 +52,7 @@ jobs:
         with:
           context: .
           push: true
-          # Название образа в нижнем регистре (требование Docker)
-          tags: ghcr.io/${{ github.repository }}:latest
+          # Используем исправленную переменную REPO_LOWER
+          tags: ghcr.io/${{ env.REPO_LOWER }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
