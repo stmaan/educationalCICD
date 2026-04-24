@@ -1,3 +1,8 @@
+import time
+
 print("Hello from CI/CD pipeline!")
-import os
-# Trigger CI/CD
+print("App is now running as a background service...")
+
+# Заставляем контейнер жить вечно
+while True:
+    time.sleep(60)
