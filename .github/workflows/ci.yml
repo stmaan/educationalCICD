@@ -1,16 +1,24 @@
-name: CI/CD with Approval
+name: CI/CD with Telegram Notifications
 
 on:
   push:
     branches: [ main, staging ]
 
 jobs:
-  # --- ЗАДАЧА 1: Сборка и деплой в Staging ---
   build-and-staging:
     runs-on: self-hosted
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Notify Telegram (Start)
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: |
+            🚀 Началась сборка ветки ${{ github.ref_name }}.
+            Автор: ${{ github.actor }}
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
@@ -27,28 +35,36 @@ jobs:
 
       - name: Deploy to Staging
         run: |
-          mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBECONFIG_DATA }}" > $HOME/.kube/config
-          # Деплоим в staging всегда при пуше в любую из веток
           kubectl apply -f k8s-deployment.yml -n staging
           kubectl set image deployment/educational-app python-app=stmaan/educationalcicd:staging -n staging
 
-  # --- ЗАДАЧА 2: Деплой в Production (с ручным одобрением) ---
+      - name: Notify Telegram (Success)
+        if: success()
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: |
+            ✅ Staging деплой успешно завершен!
+            ${{ github.ref_name == 'main' && '⏳ Жду подтверждения для Production...' || '👌 Готово к тестам.' }}
+
   deploy-production:
     runs-on: self-hosted
-    needs: build-and-staging  # Ждем завершения первой задачи
-    if: github.ref == 'refs/heads/main' # Запускаем только для ветки main
-    environment: production   # <--- СВЯЗКА С ТВОИМ ENV В SETTINGS
+    needs: build-and-staging
+    if: github.ref == 'heads/main'
+    environment: production
     
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Deploy to Production
         run: |
-          mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBECONFIG_DATA }}" > $HOME/.kube/config
-          # Деплоим в prod (используем тег latest или отдельный prod тег)
           kubectl apply -f k8s-deployment.yml -n production
           kubectl set image deployment/educational-app python-app=stmaan/educationalcicd:staging -n production
-# Workflow with Manual Approval
+
+      - name: Notify Telegram (Prod Success)
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: |
+            🚀🚀🚀 PRODUCTION ОБНОВЛЕН! 🚀🚀🚀
+            Приложение доступно в основном неймспейсе.
